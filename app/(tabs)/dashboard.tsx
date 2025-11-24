@@ -2,6 +2,7 @@
 import React from "react";
 import { ScrollView, StyleSheet } from "react-native";
 import { BotStatusCard } from "./components/botstatuscard";
+import { SensorAlerts } from "./components/sensoralerts";
 
 const COLORS = {
   background: "#EDE7F6",
@@ -15,6 +16,9 @@ export default function Dashboard() {
     >
       {/* Focused Bot Status Card */}
       <BotStatusCard />
+
+      {/* Sensor Alerts Card */}
+      <SensorAlerts />
     </ScrollView>
   );
 }
@@ -22,5 +26,6 @@ export default function Dashboard() {
 const styles = StyleSheet.create({
   content: { 
     padding: 16,
+    gap: 16, // space between cards (React Native >=0.71)
   },
 });
