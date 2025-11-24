@@ -1,9 +1,8 @@
-// app/(tabs)/_layout.tsx
 import { HapticTab } from '@/components/haptic-tab';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import { Animated, Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -20,6 +19,7 @@ export default function TabLayout() {
   const colorScheme = useColorScheme();
   const activeColor = Colors[colorScheme ?? 'light'].tint;
   const inactiveColor = Colors[colorScheme ?? 'light'].tabIconDefault;
+  const router = useRouter(); // <<< add router
 
   // Burger menu state
   const [menuVisible, setMenuVisible] = useState(false);
@@ -43,7 +43,9 @@ export default function TabLayout() {
     }).start(() => setMenuVisible(false));
   };
 
-  const handleLogout = () => console.log('Logout clicked');
+  const handleLogout = () => {
+    router.replace('/login'); // <<< navigate to login screen
+  };
   const handleAddBot = () => console.log('Add Bot clicked');
   const handleSettings = () => console.log('Settings clicked');
   const handleProfile = () => console.log('Profile clicked');
@@ -79,7 +81,6 @@ export default function TabLayout() {
             },
           }}
         >
-          {/* 🔍 Live Map */}
           <Tabs.Screen
             name="live-map"
             options={{
@@ -87,8 +88,6 @@ export default function TabLayout() {
               tabBarIcon: ({ color }) => <Ionicons name="location" size={28} color={color} />,
             }}
           />
-
-          {/* 📡 Controls */}
           <Tabs.Screen
             name="controls"
             options={{
@@ -96,8 +95,6 @@ export default function TabLayout() {
               tabBarIcon: ({ color }) => <Ionicons name="radio" size={28} color={color} />,
             }}
           />
-
-          {/* 📊 Dashboard */}
           <Tabs.Screen
             name="dashboard"
             options={{
@@ -105,8 +102,6 @@ export default function TabLayout() {
               tabBarIcon: ({ color }) => <Ionicons name="analytics" size={28} color={color} />,
             }}
           />
-
-          {/* 🧩 Tasks */}
           <Tabs.Screen
             name="tasks"
             options={{
