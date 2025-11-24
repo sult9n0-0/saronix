@@ -1,4 +1,4 @@
-// app/dashboard.tsx
+// app/tabs/Dashboard.tsx
 import { useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
 import { Animated, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -18,7 +18,6 @@ const { width } = Dimensions.get("window");
 export default function Dashboard() {
   const router = useRouter();
   const [menuVisible, setMenuVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState("Dashboard"); // Track active bottom tab
   const slideAnim = useRef(new Animated.Value(width)).current;
 
   const openMenu = () => {
@@ -91,28 +90,6 @@ export default function Dashboard() {
           </Animated.View>
         </TouchableOpacity>
       )}
-
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        {["Live Map", "Controls", "Dashboard", "Tasks"].map((tab) => {
-          const isActive = activeTab === tab;
-          let icon = "📊"; // default
-          if (tab === "Live Map") icon = "🔍";
-          if (tab === "Controls") icon = "📡";
-          if (tab === "Dashboard") icon = "📊";
-          if (tab === "Tasks") icon = "🧩";
-          return (
-            <TouchableOpacity
-              key={tab}
-              style={styles.navItem}
-              onPress={() => setActiveTab(tab)}
-            >
-              <Text style={[styles.navIcon, { color: isActive ? COLORS.accent : COLORS.muted }]}>{icon}</Text>
-              <Text style={[styles.navText, { color: isActive ? COLORS.accent : COLORS.muted }]}>{tab}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
     </View>
   );
 }
@@ -134,19 +111,4 @@ const styles = StyleSheet.create({
   menu: { position: "absolute", top: 0, width: "60%", height: "100%", backgroundColor: COLORS.primary, paddingTop: 50, paddingHorizontal: 16 },
   menuItem: { paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: COLORS.accent + "33" },
   menuItemText: { color: COLORS.accent, fontWeight: "bold", fontSize: 16 },
-  bottomNav: {
-    position: "absolute",
-    bottom: 0,
-    width: "100%",
-    height: 60,
-    backgroundColor: COLORS.primary,
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    borderTopWidth: 1,
-    borderTopColor: COLORS.secondary,
-  },
-  navItem: { justifyContent: "center", alignItems: "center" },
-  navIcon: { fontSize: 20 },
-  navText: { fontSize: 12, marginTop: 2 },
 });
