@@ -1,14 +1,11 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { View } from 'react-native';
+import { MapPanel } from './components/mappanel';
 
 export default function LiveMap() {
   return (
-    <View style={styles.container}>
-      <Text>Live Map Screen</Text>
+    <View style={{ flex: 1 }}>
+      <MapPanel />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-});

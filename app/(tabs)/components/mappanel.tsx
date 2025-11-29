@@ -6,7 +6,6 @@ import Svg, { Circle, Defs, G, Line, Path, Pattern, Polygon, Rect, Text as SvgTe
 interface MapPanelProps {
   style?: object;
 }
-
 export function MapPanel({ style }: MapPanelProps) {
   const botX = 50;
   const botY = 30;
@@ -28,25 +27,21 @@ export function MapPanel({ style }: MapPanelProps) {
     { from: { x: botX, y: botY }, to: { x: 75, y: 40 } },
   ];
 
-  const { width } = Dimensions.get("window");
-  const mapSize = width - 32; // padding
+  const { width, height } = Dimensions.get("window");
 
   return (
-    <View style={[styles.card, style]}>
-      <Text style={styles.title}>Navigation Map</Text>
-
-      {/* Map SVG */}
+    <View style={styles.fullscreen}>
+      {/* Map SVG fills entire screen minus nav/header */}
       <View style={styles.mapContainer}>
-        <Svg width={mapSize} height={mapSize} viewBox="0 0 100 100">
-          {/* Grid */}
+        <Svg width="100%" height="100%" viewBox="0 0 100 100">
           <Defs>
             <Pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
               <Path d="M 10 0 L 0 0 0 10" stroke="rgba(0,213,255,0.1)" strokeWidth="0.5" fill="none" />
             </Pattern>
           </Defs>
+
           <Rect width="100" height="100" fill="url(#grid)" />
 
-          {/* Safe Paths */}
           {safePaths.map((path, idx) => (
             <Line
               key={idx}
@@ -60,7 +55,6 @@ export function MapPanel({ style }: MapPanelProps) {
             />
           ))}
 
-          {/* Obstacles */}
           {obstacles.map((ob, idx) => (
             <G key={idx}>
               <Rect
@@ -85,7 +79,6 @@ export function MapPanel({ style }: MapPanelProps) {
             </G>
           ))}
 
-          {/* Survivors */}
           {survivors.map((s) => (
             <G key={s.id}>
               <Circle cx={s.x} cy={s.y} r="2.5" fill="rgba(34,197,94,0.8)" stroke="rgba(34,197,94,1)" strokeWidth="1" />
@@ -93,7 +86,6 @@ export function MapPanel({ style }: MapPanelProps) {
             </G>
           ))}
 
-          {/* Bot */}
           <G>
             <Circle cx={botX} cy={botY} r="3" fill="rgba(0,213,255,1)" stroke="rgba(0,213,255,0.5)" strokeWidth="1" />
             <Polygon
@@ -105,20 +97,23 @@ export function MapPanel({ style }: MapPanelProps) {
         </Svg>
       </View>
 
-      {/* Legend */}
+      {/* Legend floating at bottom */}
       <View style={styles.legend}>
         <View style={styles.legendItem}>
           <View style={[styles.legendIcon, { backgroundColor: "#00d5ff" }]} />
           <Text style={styles.legendText}>Bot Position</Text>
         </View>
+
         <View style={styles.legendItem}>
           <View style={[styles.legendIcon, { backgroundColor: "#22c55e" }]} />
           <Text style={styles.legendText}>Survivors</Text>
         </View>
+
         <View style={styles.legendItem}>
           <View style={[styles.legendIcon, { backgroundColor: "#ef4444" }]} />
           <Text style={styles.legendText}>Obstacles</Text>
         </View>
+
         <View style={styles.legendItem}>
           <View style={[styles.legendIcon, { borderColor: "#22c55e", borderWidth: 1, borderStyle: "dashed" }]} />
           <Text style={styles.legendText}>Safe Path</Text>
@@ -129,45 +124,42 @@ export function MapPanel({ style }: MapPanelProps) {
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: "#1e1e2f",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
+  fullscreen: {
+    flex: 1,
+    backgroundColor: "#0f172a",
+    paddingTop: 0,
   },
-  title: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#fff",
-    marginBottom: 8,
-  },
+
   mapContainer: {
+    flex: 1,
     width: "100%",
-    aspectRatio: 1,
-    borderRadius: 12,
-    overflow: "hidden",
-    backgroundColor: "#000",
-    marginBottom: 12,
+    height: "100%",
+    backgroundColor: "#1e293b",
   },
+
   legend: {
+    position: "absolute",
+    bottom: 20,
+    left: 0,
+    right: 0,
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    justifyContent: "space-between",
+    justifyContent: "space-evenly",
   },
+
   legendItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    marginBottom: 4,
   },
+
   legendIcon: {
-    width: 12,
-    height: 12,
-    borderRadius: 2,
+    width: 14,
+    height: 14,
+    borderRadius: 3,
+    marginRight: 6,
   },
+
   legendText: {
-    fontSize: 12,
-    color: "#aaa",
+    color: "#e2e8f0",
+    fontSize: 14,
   },
 });
