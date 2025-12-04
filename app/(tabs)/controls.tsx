@@ -1,48 +1,165 @@
 import { Feather } from "@expo/vector-icons";
-import React, { useState } from "react";
-import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Audio } from "expo-av";
+import React, { useEffect, useRef, useState } from "react";
+import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, Vibration, View } from "react-native";
 import Svg, { Defs, Path, Pattern, Rect } from "react-native-svg";
 import { WebView } from "react-native-webview";
 
+// ----------------- Alert Popup Component -----------------
+const AlertPopup = ({ visible, message, onHide }: { visible: boolean; message: string; onHide: () => void }) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!visible) return;
+
+    Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+
+    const timer = setTimeout(() => {
+      Animated.timing(fadeAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => onHide());
+    }, 4000);
+
+    return () => clearTimeout(timer);
+  }, [visible]);
+
+  if (!visible) return null;
+
+  return (
+    <Animated.View style={[styles.alertPopup, { opacity: fadeAnim }]}>
+      <Text style={styles.alertText}>{message}</Text>
+    </Animated.View>
+  );
+};
+
+// ----------------- Main Component -----------------
 export default function ControlPanel() {
   const [botOnline, setBotOnline] = useState(true);
-  const [moistureData, setMoistureData] = useState<{ raw: number; percent: number; category: string } | null>(null);
-  const [modalVisible, setModalVisible] = useState(false);
+  const [humanDetected, setHumanDetected] = useState(false);
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertMessage, setAlertMessage] = useState("");
+  const [obstacleDistance, setObstacleDistance] = useState<number | null>(null);
+
+  const blinkAnim = useRef(new Animated.Value(0)).current;
+  const alertTriggeredRef = useRef(false); // ensure single alert per detection
 
   const ARDUINO_SERVER = "http://192.168.137.143:5000/move";
   const CAMERA_FEED_URL = "http://192.168.137.143:5001/video_feed";
+  const SURVIVOR_CHECK_URL = "http://192.168.137.143:5002/check_survivor";
+  const OBSTACLE_CHECK_URL = "http://192.168.137.143:5000/distance";
 
+  // ---------------- Move Handler ----------------
   const handleMove = (direction: string) => {
+    if (direction === "forward" && obstacleDistance !== null && obstacleDistance < 30) {
+      console.log("Forward blocked due to obstacle!");
+      return;
+    }
+
     fetch(ARDUINO_SERVER, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ command: direction }),
     })
-      .then((res) => res.json())
       .then(() => setBotOnline(true))
       .catch(() => setBotOnline(false));
   };
 
-  const handleMeasureMoisture = () => {
-    fetch(ARDUINO_SERVER, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ command: "moisture" }),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.status === "ok" && data.moisture) {
-          setMoistureData(data.moisture);
-          setModalVisible(true);
-        } else {
-          alert("Failed to get moisture data");
-        }
-      })
-      .catch(() => alert("Error communicating with Arduino"));
+// ---------------- Survivor detection effect ----------------
+useEffect(() => {
+  if (!humanDetected) return;
+
+  // Play alert sound
+  const playSound = async () => {
+    const { sound } = await Audio.Sound.createAsync(require("../../assets/alert.mp3"));
+    setSound(sound);
+    await sound.playAsync();
   };
+  playSound();
+
+  // Vibrate device
+  Vibration.vibrate(500);
+
+  // Blink animation
+  const blinkLoop = Animated.loop(
+    Animated.sequence([
+      Animated.timing(blinkAnim, { toValue: 1, duration: 500, useNativeDriver: false }),
+      Animated.timing(blinkAnim, { toValue: 0, duration: 500, useNativeDriver: false }),
+    ])
+  );
+  blinkLoop.start();
+
+  const timer = setTimeout(() => {
+    setHumanDetected(false);               // reset detection
+    alertTriggeredRef.current = false;     // allow next alert
+    blinkLoop.stop();
+    blinkAnim.setValue(0);
+  }, 5000);
+
+  return () => {
+    clearTimeout(timer);
+    if (sound) sound.unloadAsync();
+    blinkLoop.stop();
+    blinkAnim.setValue(0);
+  };
+}, [humanDetected]);
+
+// ---------------- Check SURVIVOR API ----------------
+useEffect(() => {
+  const interval = setInterval(async () => {
+    try {
+      const res = await fetch(SURVIVOR_CHECK_URL);
+      const data = await res.json();
+      const objects = data.objects || [];
+
+      // Only trigger if at least one person is detected and no alert is active
+      if (objects.includes("person") && !alertTriggeredRef.current) {
+        console.log("⚠️ PERSON DETECTED");
+        alertTriggeredRef.current = true;      // <- move check here
+        setHumanDetected(true);                // triggers Survivor Detection Effect
+        setAlertMessage("⚠️ Survivor Detected!");
+        setAlertVisible(true);
+      }
+
+      setBotOnline(true);
+    } catch (e) {
+      console.log("Error checking survivor:", e);
+      setBotOnline(false);
+    }
+  }, 200);
+
+  return () => clearInterval(interval);
+}, []);
+
+  // ---------------- Check OBSTACLE API ----------------
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(OBSTACLE_CHECK_URL);
+        const data = await res.json();
+        const distance = data.distance_cm;
+        const obstacle = data.obstacle;
+
+        setObstacleDistance(distance);
+
+        if (obstacle && distance < 30) {
+          console.log(`⚠️ OBSTACLE DETECTED → Distance: ${distance}cm`);
+          setAlertMessage(`⚠️ Obstacle Ahead! (${distance.toFixed(1)}cm)`);
+          setAlertVisible(true);
+        }
+
+        setBotOnline(true);
+      } catch (e) {
+        console.log("Error checking obstacle:", e);
+        setBotOnline(false);
+      }
+    }, 300);
+
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <View style={styles.card}>
+      <AlertPopup visible={alertVisible} message={alertMessage} onHide={() => setAlertVisible(false)} />
+
       {!botOnline && (
         <View style={styles.offlineBanner}>
           <Text style={styles.offlineText}>😞 Bot is offline</Text>
@@ -59,7 +176,15 @@ export default function ControlPanel() {
         )}
       </View>
 
-      <View style={styles.cameraContainer}>
+      <Animated.View
+        style={[
+          styles.cameraContainer,
+          {
+            borderWidth: blinkAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 4] }),
+            borderColor: blinkAnim.interpolate({ inputRange: [0, 1], outputRange: ["transparent", "#FF6B6B"] }),
+          },
+        ]}
+      >
         <Svg style={styles.grid} height="100%" width="100%">
           <Defs>
             <Pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
@@ -85,86 +210,68 @@ export default function ControlPanel() {
           <Feather name="zap" size={16} color="#4DD0E1" />
           <Text style={styles.powerText}>{botOnline ? "ACTIVE" : "OFFLINE"}</Text>
         </View>
-      </View>
+      </Animated.View>
 
       <View style={{ width: "100%", marginTop: 20 }}>
-        <ScrollView contentContainerStyle={{ alignItems: "center" }}>
-          <TouchableOpacity style={[styles.button, { padding: 20, backgroundColor: "#4DD0E1" }]} onPress={() => handleMove("forward")}>
+        <ScrollView contentContainerStyle={{ alignItems: "center", paddingBottom: 80 }}>
+          <TouchableOpacity style={[styles.button, { padding: 20 }]} onPress={() => handleMove("forward")}>
             <Feather name="arrow-up" size={32} color="#2B1B3D" />
           </TouchableOpacity>
 
           <View style={styles.row}>
-            <TouchableOpacity style={[styles.button, { padding: 20, backgroundColor: "#4DD0E1" }]} onPress={() => handleMove("left")}>
+            <TouchableOpacity style={[styles.button, { padding: 20 }]} onPress={() => handleMove("left")}>
               <Feather name="arrow-left" size={32} color="#2B1B3D" />
             </TouchableOpacity>
 
             <View style={{ width: 50 }} />
 
-            <TouchableOpacity style={[styles.button, { padding: 20, backgroundColor: "#4DD0E1" }]} onPress={() => handleMove("right")}>
+            <TouchableOpacity style={[styles.button, { padding: 20 }]} onPress={() => handleMove("right")}>
               <Feather name="arrow-right" size={32} color="#2B1B3D" />
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={[styles.button, { padding: 20, backgroundColor: "#4DD0E1" }]} onPress={() => handleMove("back")}>
+          <TouchableOpacity style={[styles.button, { padding: 20 }]} onPress={() => handleMove("back")}>
             <Feather name="arrow-down" size={32} color="#2B1B3D" />
           </TouchableOpacity>
 
           <TouchableOpacity style={[styles.button, { backgroundColor: "#FF6B6B", padding: 20 }]} onPress={() => handleMove("stop")}>
             <Text style={{ color: "#2B1B3D", fontWeight: "700" }}>STOP</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity style={[styles.button, { backgroundColor: "#FF6B6B", padding: 10, marginTop: 6 }]} onPress={handleMeasureMoisture}>
-            <Text style={{ color: "#2B1B3D", fontWeight: "700" }}>Measure Moisture</Text>
-          </TouchableOpacity>
         </ScrollView>
       </View>
-
-      <Modal visible={modalVisible} transparent={false} animationType="slide" onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>🌱 Moisture Status</Text>
-            {moistureData ? (
-              <View style={styles.modalData}>
-                <Text style={styles.modalText}>Category: {moistureData.category}</Text>
-                <Text style={styles.modalText}>Percent: {moistureData.percent}%</Text>
-                <Text style={styles.modalText}>Raw Value: {moistureData.raw}</Text>
-              </View>
-            ) : (
-              <Text style={styles.modalText}>No data available.</Text>
-            )}
-            <TouchableOpacity style={styles.modalButton} onPress={() => setModalVisible(false)}>
-              <Text style={styles.modalButtonText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
 
+// ----------------- Styles -----------------
 const styles = StyleSheet.create({
   card: { backgroundColor: "#2B1B3D", borderRadius: 16, padding: 16, marginBottom: 20, overflow: "hidden", alignItems: "center" },
+  humanBanner: { position: "absolute", top: 10, zIndex: 50, backgroundColor: "#FF6B6B", paddingVertical: 8, paddingHorizontal: 16, borderRadius: 12 },
+  humanBannerText: { color: "#FFF", fontWeight: "700", fontSize: 16 },
+  alertPopup: { position: "absolute", top: 60, zIndex: 100, backgroundColor: "#FF6B6B", padding: 12, borderRadius: 12 },
+  alertText: { color: "#FFF", fontWeight: "700", fontSize: 16 },
+
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%", marginBottom: 10 },
   title: { fontSize: 18, fontWeight: "600", color: "#EDE7F6" },
+
   liveBadge: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(0,0,0,0.6)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, borderWidth: 1, borderColor: "rgba(16,185,129,0.3)" },
   liveDot: { width: 6, height: 6, backgroundColor: "#4DD0E1", borderRadius: 3, marginRight: 6 },
   liveText: { color: "#4DD0E1", fontSize: 12, fontWeight: "600" },
+
   cameraContainer: { backgroundColor: "#111", borderRadius: 12, height: 220, width: "100%", justifyContent: "center", alignItems: "center", overflow: "hidden" },
   grid: { position: "absolute", opacity: 0.12 },
+
   webviewWrapper: { position: "absolute", width: "100%", height: "100%", zIndex: 10, borderRadius: 12, overflow: "hidden" },
   webview: { width: "100%", height: "100%" },
+
   centerContent: { zIndex: 20, alignItems: "center", justifyContent: "center", position: "absolute" },
+
   powerBadge: { position: "absolute", bottom: 10, right: 10, flexDirection: "row", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, borderWidth: 1, borderColor: "rgba(77,208,225,0.3)" },
   powerText: { color: "#4DD0E1", fontSize: 12, marginLeft: 4, fontWeight: "600" },
+
   row: { flexDirection: "row", marginVertical: 10 },
   button: { backgroundColor: "#4DD0E1", padding: 28, borderRadius: 60, justifyContent: "center", alignItems: "center", marginVertical: 8 },
+
   offlineBanner: { backgroundColor: "#FF6B6B", padding: 10, borderRadius: 8, marginBottom: 10, width: "100%", alignItems: "center" },
   offlineText: { color: "#EDE7F6", fontWeight: "700" },
-  modalContainer: { flex: 1, backgroundColor: "#2B1B3D", justifyContent: "center", alignItems: "center" },
-  modalContent: { backgroundColor: "#2B1B3D", borderRadius: 16, padding: 24, width: "85%", alignItems: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 10 },
-  modalTitle: { fontSize: 20, fontWeight: "700", color: "#FF6B6B", marginBottom: 16, textAlign: "center" },
-  modalData: { marginBottom: 24, alignItems: "center" },
-  modalText: { color: "#EDE7F6", fontSize: 16, marginVertical: 4 },
-  modalButton: { backgroundColor: "#4DD0E1", paddingVertical: 12, paddingHorizontal: 32, borderRadius: 12, alignItems: "center" },
-  modalButtonText: { color: "#2B1B3D", fontWeight: "700", fontSize: 16 },
 });
