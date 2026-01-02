@@ -1,6 +1,8 @@
 // components/MapPanel.tsx
 import React from "react";
-import { Dimensions, StyleSheet, Text, View } from "react-native";
+import { Dimensions, StyleSheet, View } from "react-native";
+import { ThemedView } from '@/components/themed-view';
+import { ThemedText } from '@/components/themed-text';
 import Svg, { Circle, Defs, G, Line, Path, Pattern, Polygon, Rect, Text as SvgText } from "react-native-svg";
 
 interface MapPanelProps {
@@ -28,6 +30,26 @@ export function MapPanel({ style }: MapPanelProps) {
   ];
 
   const { width, height } = Dimensions.get("window");
+
+  // Map the 0-100 svg coordinates to a real-world lat/lon/alt bounding box
+  const LAT_MIN = 37.4215;
+  const LAT_MAX = 37.4240;
+  const LON_MIN = -122.0860;
+  const LON_MAX = -122.0820;
+  const ALT_MIN = 0; // meters
+  const ALT_MAX = 30; // meters
+
+  function toLatLon(x: number, y: number) {
+    // x: 0..100 maps to lon from LON_MIN..LON_MAX
+    const lon = LON_MIN + (x / 100) * (LON_MAX - LON_MIN);
+    // y: 0..100 maps to lat from LAT_MAX..LAT_MIN (svg y increases downward)
+    const lat = LAT_MAX - (y / 100) * (LAT_MAX - LAT_MIN);
+    // altitude inversely proportional to y (higher on map -> higher altitude)
+    const alt = ALT_MIN + (1 - y / 100) * (ALT_MAX - ALT_MIN);
+    return { lat, lon, alt };
+  }
+
+  const botGeo = toLatLon(botX, botY);
 
   return (
     <View style={styles.fullscreen}>
@@ -101,24 +123,33 @@ export function MapPanel({ style }: MapPanelProps) {
       <View style={styles.legend}>
         <View style={styles.legendItem}>
           <View style={[styles.legendIcon, { backgroundColor: "#00d5ff" }]} />
-          <Text style={styles.legendText}>Bot Position</Text>
+          <ThemedText style={styles.legendText}>Bot Position</ThemedText>
         </View>
 
         <View style={styles.legendItem}>
           <View style={[styles.legendIcon, { backgroundColor: "#22c55e" }]} />
-          <Text style={styles.legendText}>Survivors</Text>
+          <ThemedText style={styles.legendText}>Survivors</ThemedText>
         </View>
 
         <View style={styles.legendItem}>
           <View style={[styles.legendIcon, { backgroundColor: "#ef4444" }]} />
-          <Text style={styles.legendText}>Obstacles</Text>
+          <ThemedText style={styles.legendText}>Obstacles</ThemedText>
         </View>
 
         <View style={styles.legendItem}>
           <View style={[styles.legendIcon, { borderColor: "#22c55e", borderWidth: 1, borderStyle: "dashed" }]} />
-          <Text style={styles.legendText}>Safe Path</Text>
+          <ThemedText style={styles.legendText}>Safe Path</ThemedText>
         </View>
       </View>
+
+      {/* Coordinates floating at top-right */}
+      <ThemedView style={styles.coordsContainer}>
+        <ThemedText type="defaultSemiBold">Coordinates</ThemedText>
+        <ThemedText>Lat: {botGeo.lat.toFixed(6)}</ThemedText>
+        <ThemedText>Lon: {botGeo.lon.toFixed(6)}</ThemedText>
+        <ThemedText>Alt: {botGeo.alt.toFixed(1)} m</ThemedText>
+        <ThemedText style={{ marginTop: 6 }}>Map X: {botX.toFixed(1)} Y: {botY.toFixed(1)}</ThemedText>
+      </ThemedView>
     </View>
   );
 }
@@ -161,5 +192,16 @@ const styles = StyleSheet.create({
   legendText: {
     color: "#e2e8f0",
     fontSize: 14,
+  },
+  coordsContainer: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(226,232,240,0.08)',
+    backgroundColor: 'rgba(15,23,42,0.72)',
+    minWidth: 140,
   },
 });

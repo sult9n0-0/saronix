@@ -3,46 +3,17 @@ import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 interface SensorAlertsProps {
-  gasLevel?: number;
   distance?: number;
   survivorCount?: number;
 }
 
 export function SensorAlerts({
-  gasLevel = 2.1,
   distance = 156,
   survivorCount = 3,
 }: SensorAlertsProps) {
-  const hasGasWarning = gasLevel > 2.0;
-
   return (
     <View style={styles.card}>
       <Text style={styles.title}>Sensors & Alerts</Text>
-
-      {/* Gas Sensor */}
-      <View style={styles.section}>
-        <View style={styles.row}>
-          <View style={styles.row}>
-            <MaterialCommunityIcons name="weather-windy" size={20} color="#FFB74D" />
-            <Text style={styles.label}>Gas Level</Text>
-          </View>
-          {hasGasWarning && (
-            <MaterialCommunityIcons
-              name="alert"
-              size={20}
-              color="#FF6B6B"
-              style={styles.blink}
-            />
-          )}
-        </View>
-        <View style={styles.row}>
-          <Text style={styles.value}>{gasLevel.toFixed(1)}</Text>
-          <Text style={styles.unit}>ppm</Text>
-        </View>
-        {hasGasWarning && (
-          <Text style={styles.warning}>⚠️ Gas leak detected - evacuate area</Text>
-        )}
-      </View>
 
       {/* Distance */}
       <View style={styles.section}>
