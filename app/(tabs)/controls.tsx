@@ -55,7 +55,13 @@ export default function ControlPanel() {
   // ---------------- Move Handler ----------------
   const handleMove = (direction: string) => {
     if (autopilot) return; // Don't allow manual moves during autopilot
-    if (direction === "forward" && obstacleDistance !== null && obstacleDistance < 30) return;
+    if (
+      direction === "forward" &&
+      obstacleDistance !== null &&
+      obstacleDistance !== 0 &&
+      obstacleDistance < 30
+    )
+      return;
 
     fetch(ARDUINO_SERVER, {
       method: "POST",
@@ -148,13 +154,18 @@ export default function ControlPanel() {
       try {
         const res = await fetch(OBSTACLE_CHECK_URL);
         const data = await res.json();
-        const distance = data.distance_cm;
+        const distance = Number(data.distance_cm);
         const obstacle = data.obstacle;
 
-        setObstacleDistance(distance);
-        obstacleDistanceRef.current = distance;
+        if (!Number.isFinite(distance)) {
+          setObstacleDistance(null);
+          obstacleDistanceRef.current = null;
+        } else {
+          setObstacleDistance(distance);
+          obstacleDistanceRef.current = distance;
+        }
 
-        if (obstacle && distance < 30) {
+        if (obstacle && distance !== 0 && distance < 30) {
           setAlertMessage(`⚠️ Obstacle Ahead! (${distance.toFixed(1)}cm)`);
           setAlertVisible(true);
         }
@@ -183,13 +194,14 @@ export default function ControlPanel() {
       while (!cancelled && autopilotRef.current) {
         const dist = obstacleDistanceRef.current;
 
-        if (dist !== null && dist < 30) {
+        if (dist !== null && dist !== 0 && dist < 30) {
           // stop and back until obstacle is gone
           await sendCommand("stop");
 
           while (
             autopilotRef.current &&
             obstacleDistanceRef.current !== null &&
+            obstacleDistanceRef.current !== 0 &&
             obstacleDistanceRef.current < 30
           ) {
             await sendCommand("back");
@@ -206,12 +218,14 @@ export default function ControlPanel() {
             // if obstacle appears while turning, back until clear, then resume turning (do not reset turnedMs)
             if (
               obstacleDistanceRef.current !== null &&
+              obstacleDistanceRef.current !== 0 &&
               obstacleDistanceRef.current < 30
             ) {
               // back until clear
               while (
                 autopilotRef.current &&
                 obstacleDistanceRef.current !== null &&
+                obstacleDistanceRef.current !== 0 &&
                 obstacleDistanceRef.current < 30
               ) {
                 await sendCommand("back");
