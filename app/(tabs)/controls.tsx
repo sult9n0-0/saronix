@@ -48,9 +48,23 @@ export default function ControlPanel() {
   const alertTriggeredRef = useRef(false);
 
   const ARDUINO_SERVER = "http://192.168.137.143:5000/move";
+  const AUTOPILOT_URL = "http://192.168.137.143:5000/autopilot";
   const CAMERA_FEED_URL = "http://192.168.137.143:5001/video_feed";
   const SURVIVOR_CHECK_URL = "http://192.168.137.143:5002/check_survivor";
   const OBSTACLE_CHECK_URL = "http://192.168.137.143:5000/distance";
+
+  const setAutopilotRemote = async (enabled: boolean) => {
+    try {
+      await fetch(AUTOPILOT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ autopilot: enabled ? 1 : 0 }),
+      });
+      setBotOnline(true);
+    } catch (e) {
+      setBotOnline(false);
+    }
+  };
 
   // ---------------- Move Handler ----------------
   const handleMove = (direction: string) => {
@@ -183,6 +197,9 @@ export default function ControlPanel() {
   useEffect(() => {
     autopilotRef.current = autopilot;
     let cancelled = false;
+
+    // Inform backend whenever autopilot is toggled.
+    void setAutopilotRemote(autopilot);
 
     if (!autopilot) {
       // when turning autopilot off, ensure bot stops
